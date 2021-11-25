@@ -1,0 +1,1 @@
+console.log(require("fs").readFileSync("input.txt").toString().split(/[\r\n]+/g).map(v => { return v.split(/[\s-:]+/gi); }).filter(v => { var re = new RegExp(v[2], "g"); var c = Array.from(v[3].matchAll(re)).length; return c >= parseInt(v[0]) && c <= parseInt(v[1]); }).length);
