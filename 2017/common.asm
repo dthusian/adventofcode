@@ -3,19 +3,23 @@ section .text
   extern fopen
   extern fclose
   extern fgetc
+  extern putc
   extern printf
   extern malloc
   extern realloc
+  extern memcpy
   extern free
   extern exit
 
   global a8_crash
   global a8_exit
 
+  global a8_arr_push1
+
   global a8_io_init
   global a8_io_read_until
-  global a8_io_debug
-  global a8_io_debugi
+  global a8_io_print_long
+  global a8_io_writec
 
 ;;; Section: General Utilities ;;;
 ; This library provides essential functions like
@@ -89,22 +93,51 @@ LBL_4:
   mov rdi,[r12+8]
   add rdi,[r12]
   mov rsi,[r13+8]
-  xor rdx,rdx
+  xor edx,edx
   mov edx,dword [r13]
   call memcpy
+
+  xor r8d,r8d
+  mov r8d,dword [r13]
+  add dword [r12],r8d
 
   pop r13
   pop r12
   ret
 
+a8_arr_push1: ; void (*)(a8_arr*, int8_t)
+  xor r8d,r8d
+  mov r8d,dword [rdi]
+  add r8d,1
+  cmp r8d,dword [rdi+4]
+  jbe LBL_6
+  push rdi
+  push rsi
+  call a8_arr_expand
+  pop rsi
+  pop rdi
+LBL_6:
+  mov r8,qword [rdi+8]
+  xor r9d,r9d
+  mov r9d,dword [rdi]
+  mov byte [r8+r9],sil
+  inc dword [rdi]
+  ret
+
 a8_arr_expand: ; void (*)(a8_arr*)
-  xor rsi,rsi
+  xor esi,esi
   mov esi,dword [rdi+4]
   lea esi,[esi*2-16]
   mov dword [rdi+4],esi
-  mov rdi,dword [rdi+8]
+  mov rdi,qword [rdi+8]
   call realloc
   ret
+
+;;; Section: String Library ;;;
+; This section has methods that operate on
+; character arrays.
+
+; (nothing here yet)
 
 ;;; Section: I/O Library ;;;
 ; This library provides convenience functions for 
@@ -124,23 +157,16 @@ section .bss
   fp resq 1
 section .text
 
-a8_io_read_until: ; char* (*)(char);
+a8_io_read_until: ; a8_arr* (*)(char);
   ; locals:
   ; r12 = buf
   ; r13 = until_char
-  ; r14 = sz_used
-  ; r15 = sz_total
   push r12
   push r13
-  push r14
-  push r15
 
   mov r13,rdi
-  xor r14,r14
-  mov r15,128 ; initial size
 
-  mov rdi,r15
-  call malloc
+  call a8_arr_init
   mov r12,rax
 
 LBL_1:
@@ -153,50 +179,39 @@ LBL_1:
   cmp rax,r13 ; char check
   je LBL_2
 
-  mov [r12+r14],rax
-  inc r14
-  cmp r14,r15
-  jne LBL_1
+  mov rdi,rax
+  call a8_arr_push1
 
-  mov rdi,r12 ; realloc
-  shl r15,1
-  mov rsi,r15 ; lea math (funny)
-  call realloc
-  mov r12,rax
   jmp LBL_1
-
 LBL_2:
   mov rax,r12
-  mov byte [rax+r14],0x0
 
-  pop r15
-  pop r14
   pop r13
   pop r12
-
   ret
 
-a8_io_out: ; void (*)(char*);
+a8_io_writec:
+  call putc
   ret
 
-a8_io_debug: ; void (*)(char*);
+a8_io_print_long: ; void (*)(int64_t);
   push rdi
-  xor rax,rax
-  lea rdi,[rel STATIC_3]
+  xor eax,eax
+  lea rdi,[rel STATIC_5]
   pop rsi
   call printf
   ret
 section .data
-  STATIC_3 db "debug %s",0xa,0x0
+  STATIC_5 db "%d",0xa,0x0
 section .text
 
-a8_io_debugi: ; void (*)(int32_t);
+a8_io_print_str: ; void (*)(char*);
   push rdi
-  xor rax,rax
-  lea rdi,[rel STATIC_4]
+  xor eax,eax
+  lea rdi,[rel STATIC_6]
   pop rsi
   call printf
   ret
 section .data
-  STATIC_4 db "debug %d",0xa,0x0
+  STATIC_6 db "%s",0xa,0x0
 section .text
