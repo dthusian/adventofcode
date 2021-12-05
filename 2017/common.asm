@@ -194,6 +194,11 @@ a8_io_writec:
   call putc
   ret
 
+a8_io_eof:
+  mov rdi,qword [rel fp]
+  call feof
+  ret
+
 a8_io_print_long: ; void (*)(int64_t);
   push rdi
   xor eax,eax

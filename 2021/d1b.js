@@ -1,0 +1,1 @@
+console.log(require("fs").readFileSync("input.txt").toString().split("\n").filter(v => v).map(v => parseInt(v)).map((v, i, l)=> i < 3 ? 0 : l[i-1] + l[i-2] + l[i-3] < l[i] + l[i - 1] + l[i - 2]).map(v => v ? 1 : 0).reduce((a, b) => a + b));
