@@ -7,7 +7,14 @@ name = "aoc2022"
 version = "0.1.0"
 dependencies = [
  "bstr",
+ "itermore",
 ]
+
+[[package]]
+name = "arrays"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2dbdbb2877d26e0647c6b8125802b2ecf2dc2a28d864dde41e6f9b9a54da08fe"
 
 [[package]]
 name = "bstr"
@@ -19,6 +26,34 @@ dependencies = [
  "once_cell",
  "regex-automata",
  "serde",
+]
+
+[[package]]
+name = "iterchunks"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f270b1d279ac88c2a779c6241850efbcdacca136d1745b2305028a5d69b5175"
+dependencies = [
+ "arrays",
+]
+
+[[package]]
+name = "itermore"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18669db19453ddef3008c149f81853401d24988e61e4da4ba9767caed85426e3"
+dependencies = [
+ "iterchunks",
+ "iterwindows",
+]
+
+[[package]]
+name = "iterwindows"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40829c620fa10985bf98b081527e8dfd8abcc95bf3380984a1602fe4daed9ccd"
+dependencies = [
+ "arrays",
 ]
 
 [[package]]

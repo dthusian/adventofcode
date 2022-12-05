@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::Read;
 use bstr::{BString, ByteSlice};
+use itermore::IterChunks;
 
 pub fn main() {
   let mut input = BString::default();
