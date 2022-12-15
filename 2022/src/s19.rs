@@ -14,7 +14,9 @@ pub fn main() {
   let mut future_addx = 0;
   let mut x = 1;
   let mut strength = 0;
+  let mut crt = String::new();
   loop {
+    crt.push(if (x as isize - crt.len() as isize % 40 + 1).abs() <= 1 { '#' } else { '.' });
     if cycles_left <= 0 {
       x += future_addx;
       future_addx = 0;
@@ -39,5 +41,5 @@ pub fn main() {
     }
     cycle_count += 1;
   }
-  println!("{}", strength);
+  crt.as_bytes().chunks(40).for_each(|v| println!("{}", v.to_str_lossy()));
 }
