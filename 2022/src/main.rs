@@ -29,7 +29,9 @@ mod s22;
 mod s23;
 mod s24;
 mod s25;
+mod s26;
+mod s27;
 
 fn main() {
-  s25::main()
+  s27::main()
 }
