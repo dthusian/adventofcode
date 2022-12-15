@@ -21,7 +21,9 @@ mod s14;
 mod s15;
 mod s16;
 mod s17;
+mod s18;
+mod s19;
 
 fn main() {
-  s17::main()
+  s18::main()
 }
