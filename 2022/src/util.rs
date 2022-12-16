@@ -25,7 +25,17 @@ pub fn glfw() -> (Glfw, Window, Receiver<(f64, WindowEvent)>) {
   (glfw, window, events)
 }
 
-pub unsafe fn gl_tex(fmt: GLenum, w: usize, h: usize, data_fmt: GLenum, data_type: GLenum, data: *const c_void) -> GLuint {
+pub unsafe fn gl_tex1d(fmt: GLenum, l: usize, data_fmt: GLenum, data_type: GLenum, data: *const c_void) -> GLuint {
+  let mut tex = 0;
+  gl::GenTextures(1, &mut tex);
+  gl::BindTexture(gl::TEXTURE_1D, tex);
+  gl::TexParameteri(gl::TEXTURE_1D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as GLint);
+  gl::TexParameteri(gl::TEXTURE_1D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as GLint);
+  gl::TexImage1D(gl::TEXTURE_1D, 0, fmt as GLint, l as GLsizei, 0, data_fmt, data_type, data);
+  tex
+}
+
+pub unsafe fn gl_tex2d(fmt: GLenum, w: usize, h: usize, data_fmt: GLenum, data_type: GLenum, data: *const c_void) -> GLuint {
   let mut tex = 0;
   gl::GenTextures(1, &mut tex);
   gl::BindTexture(gl::TEXTURE_2D, tex);
@@ -56,8 +66,11 @@ pub unsafe fn gl_shader(glsl: String) -> GLuint {
   gl::DeleteShader(shader);
   gl::GetProgramiv(program, gl::LINK_STATUS, &mut stat);
   if stat == gl::FALSE as GLint {
+    let mut buf = vec![0u8; 1024];
+    let mut len = 0;
+    gl::GetProgramInfoLog(program, 1024, &mut len, mem::transmute::<*mut u8, *mut i8>(buf.as_mut_ptr()));
     gl::DeleteProgram(program);
-    panic!("Shader link failed");
+    panic!("Shader link failed: {}", String::from_utf8_lossy(&buf[0..len as usize]));
   }
   program
 }

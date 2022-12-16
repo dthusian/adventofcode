@@ -5,7 +5,7 @@ use bstr::{BString, ByteSlice, ByteVec};
 use glfw::Context;
 use crate::gl;
 use crate::gl::{GLsizei, GLuint};
-use crate::util::{gl_shader, gl_tex, glfw, input};
+use crate::util::{gl_shader, gl_tex2d, glfw, input};
 
 pub fn main() {
   unsafe {
@@ -14,8 +14,8 @@ pub fn main() {
     let mut glfw = glfw();
     let w = raw_input.find_byte(b'\n').unwrap();
     let h = raw_input.split_str(b"\n").count();
-    let tex_input = gl_tex(gl::R32I, w, h, gl::RED_INTEGER, gl::INT, input.as_ptr() as *const c_void);
-    let tex_output = gl_tex(gl::R32I, w, h, gl::RED_INTEGER, gl::INT, null());
+    let tex_input = gl_tex2d(gl::R32I, w, h, gl::RED_INTEGER, gl::INT, input.as_ptr() as *const c_void);
+    let tex_output = gl_tex2d(gl::R32I, w, h, gl::RED_INTEGER, gl::INT, null());
     let program = gl_shader("
 #version 450 core
 
