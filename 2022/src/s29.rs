@@ -3,6 +3,8 @@ use std::collections::HashSet;
 use bstr::{BString, ByteSlice};
 use crate::util::input;
 
+const SEARCH_RANGE: i64 = 4_000_000;
+
 #[derive(Debug, Default, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 struct Range(pub i64, pub i64);
 
@@ -23,7 +25,7 @@ impl Range {
     if self.1 + 1 < other.0 || self.0 > other.1 + 1 {
       None
     } else {
-      Some(Range(min(self.0, other.0), max(self.1, other.1)))
+      Some(Range::new(min(self.0, other.0), max(self.1, other.1)))
     }
   }
 
@@ -33,7 +35,7 @@ impl Range {
 }
 
 #[derive(Debug, Default, Clone)]
-struct RangeSet(Vec<Range>);
+struct RangeSet(pub Vec<Range>);
 
 impl RangeSet {
   pub fn add(&mut self, range: Range) {
@@ -55,6 +57,27 @@ impl RangeSet {
   pub fn total_len(&self) -> i64 {
     self.0.iter().map(|v| v.len()).sum()
   }
+
+  pub fn diff(&mut self, range: Range) -> RangeSet {
+    let mut rangeset = RangeSet::default();
+    self.0.sort();
+    let mut i = range.0;
+    for range2 in &self.0 {
+      if range2.0 < i && range2.1 < i {
+        continue;
+      }
+      if range2.0 <= i && range2.1 >= i {
+        i = range2.1 + 1;
+        continue;
+      }
+      rangeset.0.push(Range::new(i, range2.0 - 1));
+      i = range2.1 + 1;
+    }
+    if i <= range.1 {
+      rangeset.0.push(Range::new(i, range.1))
+    }
+    rangeset
+  }
 }
 
 fn sensor_to_range(sensor: (i64, i64, i64), row: i64) -> Option<Range> {
@@ -62,16 +85,16 @@ fn sensor_to_range(sensor: (i64, i64, i64), row: i64) -> Option<Range> {
   if y_offset > sensor.2 {
     None
   } else {
-    Some(Range(sensor.0 - (sensor.2 - y_offset), sensor.0 + (sensor.2 - y_offset)))
+    Some(Range::new(sensor.0 - (sensor.2 - y_offset), sensor.0 + (sensor.2 - y_offset)))
   }
 }
 
-fn consider_row(sensors: Vec<(i64, i64, i64)>, known_beacons: HashSet<(i64, i64)>, row: i64) -> i64 {
+fn consider_row(sensors: &[(i64, i64, i64)], _known_beacons: &HashSet<(i64, i64)>, row: i64) -> RangeSet {
   let mut rangeset = RangeSet::default();
   sensors.iter()
     .filter_map(|v| sensor_to_range(v.clone(), row))
     .for_each(|v| rangeset.add(v));
-  rangeset.total_len() - known_beacons.iter().filter(|v| v.1 == row).count() as i64
+  rangeset.diff(Range::new(0, SEARCH_RANGE))
 }
 
 fn parse(input: BString) -> (Vec<(i64, i64, i64)>, HashSet<(i64, i64)>) {
@@ -101,5 +124,11 @@ fn parse(input: BString) -> (Vec<(i64, i64, i64)>, HashSet<(i64, i64)>) {
 
 pub fn main() {
   let (sensors, known_beacons) = parse(input());
-  println!("{}", consider_row(sensors, known_beacons, 2_000_000));
+  for i in 0..SEARCH_RANGE {
+    let maybe_beacon = consider_row(&sensors, &known_beacons, i);
+    if maybe_beacon.0.len() != 0 {
+      println!("{}", maybe_beacon.0[0].0 * 4_000_000 + i);
+      break;
+    }
+  }
 }
