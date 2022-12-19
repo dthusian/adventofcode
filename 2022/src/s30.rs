@@ -115,16 +115,17 @@ fn dp(state: &mut DPState, graph: &OptimizedGraph, time: i64, bitmask: u64, posi
     let (mut best_pressure, mut best_pressure_path) = dp(state, graph, time - 1, bitmask, position);
     best_pressure += bitmask_to_flow(bitmask, graph);
     for cmove in possible_moves {
+      let time_to_prev = graph.1[&(position, cmove)] + 1;
       // can't get to this node in time
-      if time - (graph.1[&(position, cmove)] + 1) < 0 {
+      if time - time_to_prev <= 0 {
         continue;
       }
       let prev_bitmask = bitmask & !(1 << cmove);
-      let (mut maybe_best_pressure, maybe_best_pressure_path) = dp(state, graph, time - (graph.1[&(position, cmove)] + 1), prev_bitmask, cmove);
+      let (mut maybe_best_pressure, maybe_best_pressure_path) = dp(state, graph, time - time_to_prev, prev_bitmask, cmove);
       if maybe_best_pressure < 0 {
         continue;
       }
-      maybe_best_pressure += bitmask_to_flow(prev_bitmask, graph) * (graph.1[&(position, cmove)] + 1);
+      maybe_best_pressure += bitmask_to_flow(prev_bitmask, graph) * time_to_prev;
       if maybe_best_pressure > best_pressure {
         best_pressure = maybe_best_pressure;
         best_pressure_path = maybe_best_pressure_path;
@@ -159,4 +160,5 @@ pub fn main() {
   }
   println!("{}", best_pressure);
   println!("{:?}", best_pressure_path);
+  println!("{:?}", dp(&mut state, &graph, 30, 0b111111, 1));
 }
