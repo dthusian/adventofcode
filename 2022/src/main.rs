@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+extern crate core;
+
 mod gl;
 mod util;
 
@@ -33,7 +35,8 @@ mod s26;
 mod s27;
 mod s28;
 mod s29;
+mod s30;
 
 fn main() {
-  s29::main()
+  s30::main()
 }
