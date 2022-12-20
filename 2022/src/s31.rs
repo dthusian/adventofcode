@@ -139,9 +139,10 @@ pub fn main() {
   if num_nodes > 63 {
     panic!("bitmask cannot store more than 63 nodes");
   }
-  let best_pressure = (0u64..1 << num_nodes)
+  let num_masks = 1 << (num_nodes - 1);
+  let best_pressure = (0u64..num_masks)
     .into_par_iter()
-    .progress_count(1 << num_nodes)
+    .progress_count(num_masks)
     .map(|rmask| dp(&flows, &dist, &dist2aa, rmask) + dp(&flows, &dist, &dist2aa, !rmask))
     .reduce(|| i64::MIN,|a, b| max(a, b));
   println!("{}", best_pressure);
