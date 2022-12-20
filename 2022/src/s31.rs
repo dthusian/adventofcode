@@ -2,6 +2,7 @@ use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::iter::Iterator;
 use bstr::{BString, ByteSlice};
+use indicatif::{ParallelProgressIterator, ProgressBar};
 use itermore::IterSorted;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelBridge, ParallelIterator};
 use rayon::range::Iter;
@@ -140,6 +141,7 @@ pub fn main() {
   }
   let best_pressure = (0u64..1 << num_nodes)
     .into_par_iter()
+    .progress_count(1 << num_nodes)
     .map(|rmask| dp(&flows, &dist, &dist2aa, rmask) + dp(&flows, &dist, &dist2aa, !rmask))
     .reduce(|| i64::MIN,|a, b| max(a, b));
   println!("{}", best_pressure);
