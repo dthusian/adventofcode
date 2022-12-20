@@ -1,7 +1,10 @@
-use std::cmp::{max, min, Ordering};
+use std::cmp::{max, min};
 use std::collections::HashMap;
+use std::iter::Iterator;
 use bstr::{BString, ByteSlice};
 use itermore::IterSorted;
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelBridge, ParallelIterator};
+use rayon::range::Iter;
 use crate::util::input;
 
 fn find<T: IntoIterator>(iter: T, element: <T as IntoIterator>::Item) -> usize
@@ -37,32 +40,42 @@ fn parse(input: &BString) -> (HashMap<u16, i64>, HashMap<u16, Vec<u16>>) {
   (value, adj)
 }
 
-type OptimizedGraph = (Vec<i64> /* valve flow rates */, HashMap<(usize, usize), bool> /* adj */);
+type OptimizedGraph = (Vec<i64> /* valve flow rates */, HashMap<(i64, i64), i64> /* dist */, Vec<i64> /* distance from starting node */);
 
 fn optimize_graph(value: &HashMap<u16, i64>, adj: &HashMap<u16, Vec<u16>>) -> OptimizedGraph {
-  let remap = value.iter().map(|v| *v.0).sorted_by(|a, b| {
-    if *a == chars_to_node_id(b"AA") {
-      return Ordering::Less
-    }
-    if *b == chars_to_node_id(b"AA") {
-      return Ordering::Greater
-    }
-    value[b].cmp(&value[a])
-  }).collect::<Vec<_>>();
-  let mut adj2 = HashMap::<(usize, usize), bool>::new();
-  for i in 0..adj.len() {
-    for j in 0..adj.len() {
-      adj2.insert((i, j), false);
+  let node_names = value.keys().map(|v| *v).collect::<Vec<_>>();
+  let mut dist = HashMap::new();
+  // Floyd-Warshall
+  for i in &node_names {
+    for j in &node_names {
+      dist.insert((*i, *j), 99999);
     }
   }
-  for i in 0..adj.len() {
-    let adjacent = &adj[&remap[i]];
-    for j in adjacent {
-      *adj2.get_mut(&(i, remap.iter().position(|v| v == j).unwrap())).unwrap() = true;
+  for i in &node_names {
+    *dist.get_mut(&(*i, *i)).unwrap() = 0;
+    for n in &adj[&i] {
+      *dist.get_mut(&(*i, *n)).unwrap() = 1;
     }
   }
-  let mut value2 = remap.iter().map(|v| value[v]).collect::<Vec<_>>();
-  (value2, adj2)
+  for k in &node_names {
+    for i in &node_names {
+      for j in &node_names {
+        if dist[&(*i, *j)] > dist[&(*i, *k)] + dist[&(*k, *j)] {
+          *dist.get_mut(&(*i, *j)).unwrap() = dist[&(*i, *k)] + dist[&(*k, *j)];
+        }
+      }
+    }
+  }
+  let relevant = value.iter().filter(|v| *v.1 > 0).map(|v| *v.0).sorted().collect::<Vec<_>>();
+  let mut dist2 = HashMap::new();
+  let dist2aa = relevant.iter().map(|v| dist[&(chars_to_node_id(b"AA"), *v)]).collect::<Vec<_>>();
+  let value2 = relevant.iter().map(|v| value[v]).collect::<Vec<_>>();
+  for rnode_i in relevant.iter().enumerate() {
+    for rnode_j in relevant.iter().enumerate() {
+      dist2.insert((rnode_i.0 as i64, rnode_j.0 as i64), dist[&(*rnode_i.1, *rnode_j.1)]);
+    }
+  }
+  (value2, dist2, dist2aa)
 }
 
 fn bitmask_to_flow(bitmask: u64, flows: &[i64]) -> i64 {
@@ -73,77 +86,63 @@ fn bitmask_to_flow(bitmask: u64, flows: &[i64]) -> i64 {
     .sum()
 }
 
+type DPElement = i64;
+type DPState = Vec<Vec<Vec<Option<DPElement>>>>;
+
 fn max_assign<T: Ord + Clone>(a: &mut T, b: T) {
   *a = max((*a).clone(), b);
 }
 
-pub fn main() {
-  let old_graph = parse(&input());
-  let (flows, adj) = optimize_graph(&old_graph.0, &old_graph.1);
+fn dp(flows: &Vec<i64>, dist: &HashMap<(i64, i64), i64>, dist2aa: &Vec<i64>, mask: u64) -> i64 {
   let num_nodes = flows.len();
-  let num_useful_valves = flows.iter().enumerate().filter(|v| *v.1 != 0).last().unwrap().0 + 1;
-  println!("num nodes: {}", num_nodes);
-  println!("num nodes with flowrate!=0: {}", num_useful_valves);
-  if num_useful_valves > 63 {
-    panic!("bitmask cannot store more than 63 nodes");
-  }
-  let mut state: Vec<Vec<Vec<Option<i64>>>> = vec![vec![vec![None; num_nodes]; num_nodes]; 1 << num_useful_valves];
+  let mut state: DPState = vec![vec![vec![None; num_nodes]; 1 << num_nodes]; 35];
   // initialize base case
-  // no valves open, both workers at node 0, time = 0
-  state[0][0][0] = Some(0);
+  for node in 0..num_nodes {
+    state[dist2aa[node] as usize][0][node] = Some(0);
+  }
   // dp dp dp dp dp dp
-  for t in 0..26 {
-    let mut new_state: Vec<Vec<Vec<Option<i64>>>> = vec![vec![vec![None; num_nodes]; num_nodes]; 1 << num_useful_valves];
-    println!("t={}", t);
-    for bitmask in 0..1 << num_useful_valves {
-      for my_pos in 0..num_nodes {
-        for el_pos in 0..num_nodes {
-          let current = state[bitmask][my_pos][el_pos];
-          if current.is_none() {
+  let mut best_pressure = i64::MIN;
+  for t in 1..=26 {
+    for omask in 0..1 << num_nodes {
+      for pos in 0..num_nodes {
+        let current = state[t][omask][pos];
+        if current.is_none() { continue; }
+        let current = current.unwrap();
+        // possible move: wait one minute
+        max_assign(&mut state[t + 1][omask][pos],
+                   Some(current + bitmask_to_flow(omask as u64 & mask, &flows)));
+        // possible move: move to a node
+        for possible_move in 0..num_nodes {
+          let dist_to_dest = dist[&(pos as i64, possible_move as i64)];
+          if dist_to_dest + t as i64 > 30 {
+            // cannot reach in time
             continue;
           }
-          let current = current.unwrap();
-          vec![
-            // both you and elephant move
-            (0..num_nodes)
-              .map(|v| (0..num_nodes)
-                .map(|v2| (v, v2))
-                .collect::<Vec<_>>()
-              )
-              .flatten()
-              .filter(|v| adj[&(my_pos, v.0)] && adj[&(el_pos, v.1)])
-              .map(|v| (bitmask, v.0, v.1))
-              .collect::<Vec<_>>(),
-            // you move, elephant opens
-            (0..num_nodes)
-              .filter(|_| flows[el_pos] != 0)
-              .filter(|v| adj[&(my_pos, *v)])
-              .map(|v| (bitmask | (1 << el_pos), v, el_pos))
-              .collect(),
-            // you open, elephant moves
-            (0..num_nodes)
-              .filter(|_| flows[my_pos] != 0)
-              .filter(|v| adj[&(el_pos, *v)])
-              .map(|v| (bitmask | (1 << my_pos), my_pos, v))
-              .collect(),
-            // both you and the elephant open
-            vec![(bitmask | (1 << my_pos) | (1 << el_pos), my_pos, el_pos)]
-              .into_iter()
-              .filter(|_| flows[el_pos] != 0 && flows[my_pos] != 0)
-              .collect()
-          ].iter().flatten().for_each(|v| {
-            max_assign(&mut new_state[v.0][v.1][v.2], Some(current + bitmask_to_flow(bitmask as u64, &flows)));
-          });
+          max_assign(&mut state[t + dist_to_dest as usize][omask][possible_move],
+                     Some(current + bitmask_to_flow(omask as u64 & mask, &flows) * dist_to_dest));
         }
+        // possible move: open the current valve
+        max_assign(&mut state[t + 1][omask | (1 << pos)][pos],
+                   Some(current + bitmask_to_flow(omask as u64 & mask, &flows)));
+        best_pressure = max(best_pressure, current);
       }
     }
-    state = new_state;
   }
-  let best_pressure = state.iter()
-    .flatten()
-    .flatten()
-    .reduce(|a, b| max(a, b))
-    .unwrap()
-    .unwrap();
+  best_pressure
+}
+
+pub fn main() {
+  let old_graph = parse(&input());
+  let (flows, dist, dist2aa) = optimize_graph(&old_graph.0, &old_graph.1);
+  let num_nodes = flows.len();
+  if num_nodes > 63 {
+    panic!("bitmask cannot store more than 63 nodes");
+  }
+  let best_pressure = (0u64..1 << num_nodes)
+    .into_par_iter()
+    .map(|rmask| dp(&flows, &dist, &dist2aa, rmask) + dp(&flows, &dist, &dist2aa, !rmask))
+    .reduce(|| i64::MIN,|a, b| max(a, b));
   println!("{}", best_pressure);
 }
+
+// rmask = role mask, omask = opened mask
