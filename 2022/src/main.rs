@@ -37,7 +37,8 @@ mod s28;
 mod s29;
 mod s30;
 mod s31;
+mod s32;
 
 fn main() {
-  s31::main()
+  s32::main()
 }
