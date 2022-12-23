@@ -83,6 +83,9 @@ mod heuristics {
   }
 
   pub fn projected_resources_2(blueprint: Blueprint, node: Node, dest_geodes: i16) -> f32 {
+    if node[N_GEODE] >= dest_geodes {
+      return 0.0
+    }
     let a = blueprint[B_GEODE_BOT_OBBI] as f32 / 4.0;
     let b = (blueprint[B_GEODE_BOT_OBBI] as f32) * (node[N_OBBI_BOTS] as f32) / 2.0;
     let c = node[N_GEODE_BOTS] as f32 + (blueprint[B_GEODE_BOT_OBBI] as f32) * (node[N_OBBI] as f32) / 2.0;
@@ -268,9 +271,12 @@ fn real_main() {
 }
 
 pub fn main() {
-  if env::var("AOC_MODE").unwrap() == "compliance" {
+  let mode = env::var("AOC_MODE").unwrap_or("default".into());
+  if mode == "compliance" {
     compliance_test();
-  } else {
+  } else if mode == "write_nodes" {
     test_main();
+  } else {
+    real_main();
   }
 }
