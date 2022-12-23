@@ -23,3 +23,7 @@ indicatif = { version = "0.17.2", features = ["rayon"] }
 
 # Day 17, used to hash the last 200 rows to check for cycles
 ring = "0.17.0-alpha.11"
+
+# Day 19, used for a heuristic function utilizing the general cubic formula
+num = "0.4.0"
+num-complex = "0.4.0"
