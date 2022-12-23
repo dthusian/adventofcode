@@ -232,7 +232,7 @@ fn test_main() {
       blueprint,
       START_NODE,
       9,
-      heuristics::default,
+      heuristics::projected_geodes,
       AStarConfig {
         debug: false,
         extract_nodes: true
