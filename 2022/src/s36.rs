@@ -111,14 +111,14 @@ mod heuristics {
     let root_0 = -(b + big_c + delta0_over_big_c) / (3.0 * a);
     let root_1 = -(b + cbrt_unity_1 * big_c + cbrt_unity_1.recip() * delta0_over_big_c) / (3.0 * a);
     let root_2 = -(b + cbrt_unity_2 * big_c + cbrt_unity_2.recip() * delta0_over_big_c) / (3.0 * a);
-    if root_0.im < 1e-5 {
+    if root_0.im < 1e-3 {
       root_0.re
-    } else if root_1.im < 1e-5 {
+    } else if root_1.im < 1e-3 {
       root_1.re
-    } else if root_2.im < 1e-5 {
+    } else if root_2.im < 1e-3 {
       root_2.re
     } else {
-      f32::INFINITY
+      panic!("no real roots")
     }
   }
 }
@@ -241,20 +241,35 @@ fn test_main() {
   );
 }
 
-fn compliance_test() {
+fn compliance_test(mode: i32) {
   let blueprint = [4, 2, 3, 14, 2, 7];
   let mut buf = vec![];
   File::open("debug.json").unwrap().read_to_end(&mut buf).unwrap();
   let nodes = serde_json::from_slice::<Vec<Node>>(&buf).unwrap();
-  nodes.into_par_iter()
+  let nodes_len = nodes.len();
+  let avg = nodes.into_par_iter()
     .progress()
-    .for_each(|v| {
-    let real_dist = a_star(blueprint, v, 9, heuristics::projected_geodes, AStarConfig::default());
-    let h_score = heuristics::projected_resources_2(blueprint, v, 9);
-    if h_score > real_dist as f32 {
-      println!("node {:?} h={} real={}", v, h_score, real_dist);
-    }
-  });
+    .map(|v| {
+      if mode == 1 {
+        let h_score = heuristics::projected_resources_2(blueprint, v, 9);
+        let real_dist = a_star(blueprint, v, 9, heuristics::projected_geodes, AStarConfig::default());
+        if h_score > real_dist as f32 {
+          println!("node {:?} h={} real={}", v, h_score, real_dist);
+        }
+        0.0
+      } else if mode == 2 {
+        let h_score = heuristics::projected_geodes(blueprint, v, 9);
+        let real_dist = a_star(blueprint, v, 9, heuristics::projected_geodes, AStarConfig::default());
+        h_score as f64 - real_dist as f64
+      } else if mode == 3 {
+        let h_score = heuristics::projected_resources_2(blueprint, v, 9);
+        let real_dist = a_star(blueprint, v, 9, heuristics::projected_geodes, AStarConfig::default());
+        h_score as f64 - real_dist as f64
+      } else {
+        panic!("bad");
+      }
+  }).sum::<f64>() / (nodes_len as f64);
+  println!("avg: {}", avg);
 }
 
 fn real_main() {
@@ -272,8 +287,12 @@ fn real_main() {
 
 pub fn main() {
   let mode = env::var("AOC_MODE").unwrap_or("default".into());
-  if mode == "compliance" {
-    compliance_test();
+  if mode == "compliance_admissible" {
+    compliance_test(1);
+  } else if mode == "compliance_avgdiff_pg" {
+    compliance_test(2);
+  } else if mode == "compliance_avgdiff_pr2" {
+    compliance_test(3);
   } else if mode == "write_nodes" {
     test_main();
   } else {
