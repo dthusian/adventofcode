@@ -1,8 +1,6 @@
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap, VecDeque};
+use std::collections::{BinaryHeap, BTreeSet, HashMap, VecDeque};
 use bstr::ByteSlice;
-use rayon::iter::ParallelBridge;
-use rayon::iter::ParallelIterator;
 use crate::util::input;
 
 const OUTPUT_PATHS: bool = true;
@@ -29,27 +27,25 @@ const N_GEODE_BOTS: usize = 7;
 
 type Node = [i64; 8];
 
-fn add_nodes(b: [i64; 8], d: [i64; 8]) -> [i64; 8] {
+const START_NODE: Node = [0, 1, 0, 0, 0, 0, 0, 0];
+
+fn add_nodes(b: Node, d: Node) -> Node {
   b.into_iter().zip(d.into_iter()).map(|v| v.0 + v.1).collect::<Vec<_>>().try_into().unwrap()
 }
 
-#[derive(PartialEq, Copy, Clone)]
-struct ScoredNode(pub Node, pub f64);
-
-impl Eq for ScoredNode { }
+#[derive(PartialEq, Eq, Copy, Clone)]
+struct ScoredNode(pub Node, pub i64);
 
 impl Ord for ScoredNode {
+  // NaN is greater than everything to not search those nodes
   fn cmp(&self, other: &Self) -> Ordering {
-    match self.partial_cmp(other) {
-      None => Ordering::Equal,
-      Some(ord) => ord
-    }
+    other.1.cmp(&self.1)
   }
 }
 
 impl PartialOrd for ScoredNode {
   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-    other.1.partial_cmp(&self.1)
+    Some(self.cmp(other))
   }
 }
 
@@ -57,9 +53,8 @@ impl PartialOrd for ScoredNode {
 mod heuristics {
   use crate::s36::{N_GEODE, N_GEODE_BOTS, Node};
 
-  pub fn default(node: Node, dest_geodes: i64) -> f64 {
+  pub fn default(node: Node, dest_geodes: i64) -> i64 {
     projected_geodes(node, dest_geodes)
-    //projected_geodes(node, dest_geodes)
   }
 
   // dumb heuristic: 14.34s
@@ -67,20 +62,28 @@ mod heuristics {
     0
   }
 
+  pub fn worse_projected_geodes(node: Node, dest_geodes: i64) -> i64 {
+    (((dest_geodes - node[N_GEODE]) / 2) as f64).sqrt().floor() as i64
+  }
+
   // projected geodes heuristic: 0.43s
-  pub fn projected_geodes(node: Node, dest_geodes: i64) -> f64 {
+  pub fn projected_geodes(node: Node, dest_geodes: i64) -> i64 {
     // geodes = (num_bots + t / 2) * t
     // 0 = (1/2)*t^2 + num_bots*t - geodes
     // t = sqrt(num_bots^2 + 2*geodes)-num_bots
     let needed_geodes = dest_geodes - node[N_GEODE];
-    ((node[N_GEODE_BOTS].pow(2) + 2 * needed_geodes) as f64).sqrt() - node[N_GEODE_BOTS] as f64
+    let t0 = ((node[N_GEODE_BOTS].pow(2) + 2 * needed_geodes) as f64).sqrt();
+    if t0.is_nan() {
+      panic!("NaN");
+    }
+    t0.floor() as i64 - node[N_GEODE_BOTS]
   }
 }
 
 fn a_star(blueprint: Blueprint, start_node: Node, end_geodes: i64) -> i64 {
   let mut pq = BinaryHeap::new();
-  pq.push(ScoredNode(start_node, 0.0));
-  let mut g_score = HashMap::new();
+  pq.push(ScoredNode(start_node, 0));
+  let mut g_score = HashMap::<Node, i64>::new();
   let mut prev = HashMap::new();
   g_score.insert(start_node, 0);
   while !pq.is_empty() {
@@ -88,7 +91,8 @@ fn a_star(blueprint: Blueprint, start_node: Node, end_geodes: i64) -> i64 {
     let node = scored_node.0;
     if node[N_GEODE] >= end_geodes {
       // found end
-      let mut track_node = scored_node.0;
+      let total_dist = g_score[&node];
+      let mut track_node = node;
       if OUTPUT_PATHS {
         let mut path = vec![];
         while track_node != start_node {
@@ -98,10 +102,10 @@ fn a_star(blueprint: Blueprint, start_node: Node, end_geodes: i64) -> i64 {
         path.push(track_node);
         path.reverse();
         path.iter().enumerate().for_each(|v| {
-          println!("{} {:?}", v.0, v.1);
+          println!("{} {:>3?} heuristic check: ({} vs {})", v.0, v.1, heuristics::projected_geodes(*v.1, end_geodes), (total_dist - v.0 as i64));
         });
       }
-      return g_score[&scored_node.0];
+      return total_dist;
     }
     vec![
       // make nothing
@@ -118,16 +122,14 @@ fn a_star(blueprint: Blueprint, start_node: Node, end_geodes: i64) -> i64 {
       .filter(|v| v.iter().all(|v| *v >= 0))
       .map(|v| add_nodes(v, [node[N_ORE_BOTS], 0, node[N_CLAY_BOTS], 0, node[N_OBBI_BOTS], 0, node[N_GEODE_BOTS], 0]))
       .for_each(|v| {
-        let maybe_g_score = g_score[&scored_node.0] + 1;
+        let maybe_g_score = g_score[&node] + 1;
         if !g_score.contains_key(&v) || g_score[&v] > maybe_g_score {
           g_score.insert(v, maybe_g_score);
           if OUTPUT_PATHS {
-            prev.insert(v, scored_node.0);
+            prev.insert(v, node);
           }
           let h_score = heuristics::default(v, end_geodes);
-          if h_score.is_finite() {
-            pq.push(ScoredNode(v, maybe_g_score as f64 + h_score));
-          }
+          pq.push(ScoredNode(v, maybe_g_score + h_score));
         }
       });
   }
@@ -150,10 +152,9 @@ fn thread_main(blueprint: Blueprint) -> i64 {
     }
   }
   // bsearch
-  todo!();
-  while upper > lower {
+  while upper - lower > 1 {
     let mid = (upper + lower + 1) / 2;
-    let length = a_star(blueprint, [0, 1, 0, 0, 0, 0, 0, 0], mid);
+    let length = a_star(blueprint, START_NODE, mid);
     if length > MAX_TIME {
       // cannot make n geodes in time
       upper = mid;
@@ -170,7 +171,6 @@ fn real_main() {
       .map(|v| v.to_str_lossy().parse::<i64>())
       .collect::<Vec<_>>())
     .map(|v| [*v[6].as_ref().unwrap(), *v[12].as_ref().unwrap(), *v[18].as_ref().unwrap(), *v[21].as_ref().unwrap(), *v[27].as_ref().unwrap(), *v[30].as_ref().unwrap()])
-    //.par_bridge()
     .map(|v| thread_main(v))
     .collect::<Vec<_>>()
     .into_iter()
@@ -187,7 +187,7 @@ fn test_main() {
       .collect::<Vec<_>>())
     .map(|v| [*v[6].as_ref().unwrap(), *v[12].as_ref().unwrap(), *v[18].as_ref().unwrap(), *v[21].as_ref().unwrap(), *v[27].as_ref().unwrap(), *v[30].as_ref().unwrap()])
     .collect::<Vec<_>>();
-  println!("{}", a_star(input[0], [0, 1, 0, 0, 0, 0, 0, 0], 9));
+  println!("{}", a_star(input[0], START_NODE, 9));
 }
 
 pub fn main() {
