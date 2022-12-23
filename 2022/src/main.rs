@@ -45,5 +45,5 @@ mod s36;
 mod s37;
 
 fn main() {
-  s37::main()
+  s36::main()
 }

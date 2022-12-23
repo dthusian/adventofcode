@@ -5,7 +5,7 @@ use indicatif::ParallelProgressIterator;
 use rayon::prelude::*;
 use crate::util::input;
 
-const OUTPUT_PATHS: bool = false;
+const DEBUG: bool = false;
 
 const MAX_TIME: i64 = 24;
 
@@ -35,13 +35,15 @@ fn add_nodes(b: Node, d: Node) -> Node {
   b.into_iter().zip(d.into_iter()).map(|v| v.0 + v.1).collect::<Vec<_>>().try_into().unwrap()
 }
 
-#[derive(PartialEq, Eq, Copy, Clone)]
-struct ScoredNode(pub Node, pub i64);
+#[derive(PartialEq, Copy, Clone)]
+struct ScoredNode(pub Node, pub f64);
+
+impl Eq for ScoredNode { }
 
 impl Ord for ScoredNode {
   // NaN is greater than everything to not search those nodes
   fn cmp(&self, other: &Self) -> Ordering {
-    other.1.cmp(&self.1)
+    other.1.partial_cmp(&self.1).unwrap()
   }
 }
 
@@ -55,26 +57,26 @@ impl PartialOrd for ScoredNode {
 mod heuristics {
   use crate::s36::{N_GEODE, N_GEODE_BOTS, Node};
 
-  pub fn default(node: Node, dest_geodes: i64) -> i64 {
+  pub fn default(node: Node, dest_geodes: i64) -> f64 {
     projected_geodes(node, dest_geodes)
   }
 
-  pub fn dumb() -> i64 {
-    0
+  pub fn dumb() -> f64 {
+    0.0
   }
 
-  pub fn projected_geodes(node: Node, dest_geodes: i64) -> i64 {
+  pub fn projected_geodes(node: Node, dest_geodes: i64) -> f64 {
     // geodes = (num_bots + t / 2) * t
     // 0 = (1/2)*t^2 + num_bots*t - geodes
     // t = sqrt(num_bots^2 + 2*geodes)-num_bots
     let needed_geodes = dest_geodes - node[N_GEODE];
-    ((node[N_GEODE_BOTS].pow(2) + 2 * needed_geodes) as f64).sqrt().ceil() as i64 - node[N_GEODE_BOTS]
+    ((node[N_GEODE_BOTS].pow(2) + 2 * needed_geodes) as f64).sqrt() - node[N_GEODE_BOTS] as f64
   }
 }
 
 fn a_star(blueprint: Blueprint, start_node: Node, end_geodes: i64) -> i64 {
   let mut pq = BinaryHeap::new();
-  pq.push(ScoredNode(start_node, 0));
+  pq.push(ScoredNode(start_node, 0.0));
   let mut g_score = HashMap::<Node, i64>::new();
   let mut prev = HashMap::new();
   g_score.insert(start_node, 0);
@@ -85,7 +87,7 @@ fn a_star(blueprint: Blueprint, start_node: Node, end_geodes: i64) -> i64 {
       // found end
       let total_dist = g_score[&node];
       let mut track_node = node;
-      if OUTPUT_PATHS {
+      if DEBUG {
         let mut path = vec![];
         while track_node != start_node {
           path.push(track_node);
@@ -117,11 +119,16 @@ fn a_star(blueprint: Blueprint, start_node: Node, end_geodes: i64) -> i64 {
         let maybe_g_score = g_score[&node] + 1;
         if !g_score.contains_key(&v) || g_score[&v] > maybe_g_score {
           g_score.insert(v, maybe_g_score);
-          if OUTPUT_PATHS {
+          if DEBUG {
             prev.insert(v, node);
           }
           let h_score = heuristics::default(v, end_geodes);
-          pq.push(ScoredNode(v, maybe_g_score + h_score));
+          if DEBUG {
+            if h_score.is_nan() {
+              panic!("Heuristic returned NaN");
+            }
+          }
+          pq.push(ScoredNode(v, maybe_g_score as f64 + h_score));
         }
       });
   }
