@@ -1,9 +1,11 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, BTreeSet, HashMap, VecDeque};
 use bstr::ByteSlice;
+use indicatif::ParallelProgressIterator;
+use rayon::prelude::*;
 use crate::util::input;
 
-const OUTPUT_PATHS: bool = true;
+const OUTPUT_PATHS: bool = false;
 
 const MAX_TIME: i64 = 24;
 
@@ -54,16 +56,12 @@ mod heuristics {
   use crate::s36::{N_GEODE, N_GEODE_BOTS, Node};
 
   pub fn default(node: Node, dest_geodes: i64) -> i64 {
-    projected_geodes(node, dest_geodes)
+    dumb()
   }
 
   // dumb heuristic: 14.34s
   pub fn dumb() -> i64 {
     0
-  }
-
-  pub fn worse_projected_geodes(node: Node, dest_geodes: i64) -> i64 {
-    (((dest_geodes - node[N_GEODE]) / 2) as f64).sqrt().floor() as i64
   }
 
   // projected geodes heuristic: 0.43s
@@ -78,6 +76,63 @@ mod heuristics {
     }
     t0.floor() as i64 - node[N_GEODE_BOTS]
   }
+}
+
+fn debug_a_star<F: Fn(Node, i64) -> i64>(blueprint: Blueprint, start_node: Node, end_geodes: i64, heuristic: F, extract: &mut Vec<Node>) -> i64 {
+  let mut pq = BinaryHeap::new();
+  pq.push(ScoredNode(start_node, 0));
+  let mut g_score = HashMap::<Node, i64>::new();
+  let mut prev = HashMap::new();
+  g_score.insert(start_node, 0);
+  while !pq.is_empty() {
+    let scored_node = pq.pop().unwrap();
+    let node = scored_node.0;
+    if node[N_GEODE] >= end_geodes {
+      // found end
+      g_score.keys().for_each(|v| extract.push(*v));
+      let total_dist = g_score[&node];
+      let mut track_node = node;
+      if OUTPUT_PATHS {
+        let mut path = vec![];
+        while track_node != start_node {
+          path.push(track_node);
+          track_node = prev[&track_node];
+        }
+        path.push(track_node);
+        path.reverse();
+        path.iter().enumerate().for_each(|v| {
+          println!("{} {:>3?}", v.0, v.1);
+        });
+      }
+      return total_dist;
+    }
+    vec![
+      // make nothing
+      node,
+      // make ore bot
+      add_nodes(node, [-blueprint[B_ORE_BOT_ORE], 1, 0, 0, 0, 0, 0, 0]),
+      // make clay bot
+      add_nodes(node, [-blueprint[B_CLAY_BOT_ORE], 0, 0, 1, 0, 0, 0, 0]),
+      // make obbi bot
+      add_nodes(node, [-blueprint[B_OBBI_BOT_ORE], 0, -blueprint[B_OBBI_BOT_CLAY], 0, 0, 1, 0, 0]),
+      // make geobe bot
+      add_nodes(node, [-blueprint[B_GEODE_BOT_ORE], 0, 0, 0, -blueprint[B_GEODE_BOT_OBBI], 0, 0, 1]),
+    ].into_iter()
+      .filter(|v| v.iter().all(|v| *v >= 0))
+      .map(|v| add_nodes(v, [node[N_ORE_BOTS], 0, node[N_CLAY_BOTS], 0, node[N_OBBI_BOTS], 0, node[N_GEODE_BOTS], 0]))
+      .for_each(|v| {
+        let maybe_g_score = g_score[&node] + 1;
+        if !g_score.contains_key(&v) || g_score[&v] > maybe_g_score {
+          g_score.insert(v, maybe_g_score);
+          if OUTPUT_PATHS {
+            prev.insert(v, node);
+          }
+          let h_score = heuristic(v, end_geodes);
+          pq.push(ScoredNode(v, maybe_g_score + h_score));
+        }
+      });
+  }
+  panic!("destination unreachable")
 }
 
 fn a_star(blueprint: Blueprint, start_node: Node, end_geodes: i64) -> i64 {
@@ -102,7 +157,7 @@ fn a_star(blueprint: Blueprint, start_node: Node, end_geodes: i64) -> i64 {
         path.push(track_node);
         path.reverse();
         path.iter().enumerate().for_each(|v| {
-          println!("{} {:>3?} heuristic check: ({} vs {})", v.0, v.1, heuristics::projected_geodes(*v.1, end_geodes), (total_dist - v.0 as i64));
+          println!("{} {:>3?}", v.0, v.1);
         });
       }
       return total_dist;
@@ -142,7 +197,7 @@ fn thread_main(blueprint: Blueprint) -> i64 {
   // discover upper bound
   let mut tentative_upper_bound = 16i64;
   loop {
-    let time = a_star(blueprint, [0, 1, 0, 0, 0, 0, 0, 0], tentative_upper_bound);
+    let time = a_star(blueprint, START_NODE, tentative_upper_bound);
     if time > MAX_TIME {
       upper = tentative_upper_bound;
       break;
@@ -165,12 +220,18 @@ fn thread_main(blueprint: Blueprint) -> i64 {
   lower
 }
 
-fn real_main() {
-  let ans = input().split_str("\n")
+fn parse_input() -> Vec<Blueprint> {
+  input().split_str("\n")
     .map(|v| v.split_str(" ")
       .map(|v| v.to_str_lossy().parse::<i64>())
       .collect::<Vec<_>>())
     .map(|v| [*v[6].as_ref().unwrap(), *v[12].as_ref().unwrap(), *v[18].as_ref().unwrap(), *v[21].as_ref().unwrap(), *v[27].as_ref().unwrap(), *v[30].as_ref().unwrap()])
+    .collect::<Vec<_>>()
+}
+
+fn real_main() {
+  let ans = parse_input()
+    .into_iter()
     .map(|v| thread_main(v))
     .collect::<Vec<_>>()
     .into_iter()
@@ -181,15 +242,28 @@ fn real_main() {
 }
 
 fn test_main() {
-  let input = input().split_str("\n")
-    .map(|v| v.split_str(" ")
-      .map(|v| v.to_str_lossy().parse::<i64>())
-      .collect::<Vec<_>>())
-    .map(|v| [*v[6].as_ref().unwrap(), *v[12].as_ref().unwrap(), *v[18].as_ref().unwrap(), *v[21].as_ref().unwrap(), *v[27].as_ref().unwrap(), *v[30].as_ref().unwrap()])
-    .collect::<Vec<_>>();
+  let input = parse_input();
   println!("{}", a_star(input[0], START_NODE, 9));
 }
 
+fn test_main_2() {
+  const DEST: i64 = 9;
+  let input = parse_input();
+  // find a bunch of nodes
+  let mut nodes = vec![];
+  debug_a_star(input[0], START_NODE, DEST, heuristics::projected_geodes, &mut nodes);
+  nodes.into_par_iter()
+    .progress()
+    .enumerate()
+    .for_each(|v| {
+      let len = a_star(input[0], v.1, DEST);
+      let h_score = heuristics::projected_geodes(v.1, DEST);
+      if h_score > len {
+        println!("node {:?} h={} real={}", v.1, h_score, len);
+      }
+    })
+}
+
 pub fn main() {
-  test_main();
+  test_main_2();
 }
