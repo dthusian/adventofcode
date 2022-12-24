@@ -134,7 +134,7 @@ pub fn main() {
   stitch_side(&mut m_real, (90, Vec2(150, 49), 0), (90, Vec2(100, 100), 180), 50);
 
   stitch_side(&mut m_real, (0, Vec2(50, -1), 90), (270, Vec2(-1, 150), 180), 50);
-  stitch_side(&mut m_real, (0, Vec2(150, -1), 270), (180, Vec2(49, 200), 270), 50);
+  stitch_side(&mut m_real, (0, Vec2(100, -1), 90), (180, Vec2(0, 200), 90), 50);
   let mapping = m_real;
   // end hardcoding
 
