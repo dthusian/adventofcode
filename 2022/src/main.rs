@@ -51,7 +51,9 @@ mod s42;
 mod s43;
 mod s44;
 mod s45;
+mod s46;
+mod s47;
 
 fn main() {
-  s45::main()
+  s47::main()
 }
