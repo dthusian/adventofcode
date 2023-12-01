@@ -1,7 +1,7 @@
 .intel_syntax noprefix
 
 lut:
-.ascii "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+.fill 16,1,'\0'
 .ascii "one\0\0\0\0\0"
 .ascii "\xff\xff\xff\0\0\0\0\0"
 .ascii "two\0\0\0\0\0"

@@ -6,4 +6,6 @@ add_executable(adventofcode
         src/main.S
         src/p1a.S
         src/p1b.S
+        src/p2a.S
         )
+target_include_directories(adventofcode PRIVATE src/)
