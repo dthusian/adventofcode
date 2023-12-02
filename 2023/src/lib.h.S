@@ -3,17 +3,16 @@
 # must be 64-bit regs, arg1 can be immediate
 
 .macro lib_mul arg0,arg1
-  push rax
+  sub rsp,8
   push rdx
 
   mov rax,\arg0
   mov rdx,\arg1
   imul rdx
-  mov [rsp-8],rax
+  mov [rsp+8],rax
 
   pop rdx
   pop rax
-  mov \arg0,[rsp-24]
 .endm
 
 .macro lib_div arg0,arg1

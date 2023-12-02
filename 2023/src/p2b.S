@@ -131,35 +131,34 @@ loop0br:
   pop rbp
   ret
 
-.global p2a
-p2a:
+.global p2b
+p2b:
   push rbp 
   push rbx 
   push r12
   push r13 # loop cnt 100->1
   push r14 # sum
   push r15 # parsed input buf
+  sub rsp,8
 
   call parse_in
   mov r15,rax
   xor r14,r14
-  mov r13,100
+  mov r13,100 # hardcoded input sz
 
 loop3:
   # rcx: curr line
   mov rcx,r13
   dec rcx
-  lib_mul rcx,12
+  imul rcx,12
   add rcx,r15
 
-  cmp dword ptr[rcx],12
-  jg br1
-  cmp dword ptr[rcx+4],13
-  jg br1
-  cmp dword ptr[rcx+8],14
-  jg br1
-  add r14,r13
-br1:
+  mov edi,dword ptr[rcx]
+  mov eax,dword ptr[rcx+4]
+  imul rdi,rax
+  mov eax,dword ptr[rcx+8]
+  imul rdi,rax
+  add r14,rdi
 
   dec r13
   jnz loop3
@@ -170,6 +169,7 @@ loop3end:
 
   mov rax,r14
 
+  add rsp,8
   pop r15
   pop r14
   pop r13
