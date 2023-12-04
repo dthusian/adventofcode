@@ -15,36 +15,23 @@
   pop rax
 .endm
 
-.macro lib_div arg0,arg1
-  push rax
-  push rdx
-  push rcx
+#if 0
+.global p1a
+p1a:
+  push rbp
+  push rbx
+  push r12
+  push r13
+  push r14
+  push r15
+  sub rsp,8
 
-  xor edx,edx
-  mov rax,\arg0
-  mov rcx,\arg1
-  idiv rcx
-  mov [rsp-8],rax
-
-  pop rcx
-  pop rdx
-  pop rax
-  mov \arg0,[rsp-32]
-.endm
-
-.macro lib_mod arg0,arg1
-  push rax
-  push rdx
-  push rcx
-
-  xor edx,edx
-  mov rax,\arg0
-  mov rcx,\arg1
-  idiv rcx
-  mov [rsp-8],rdx
-
-  pop rcx
-  pop rdx
-  pop rax
-  mov \arg0,[rsp-32]
-.endm
+  add rsp,8
+  pop r15
+  pop r14
+  pop r13
+  pop r12
+  pop rbx
+  pop rbp
+  ret
+#endif
