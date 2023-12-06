@@ -3,3 +3,4 @@ target/
 cmake-build-debug/
 .idea/
 build/
+vgcore
