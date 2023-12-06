@@ -1,5 +1,17 @@
 .intel_syntax noprefix
-#include "lib.h.S"
+
+.macro lib_mul arg0,arg1
+  sub rsp,8
+  push rdx
+
+  mov rax,\arg0
+  mov rdx,\arg1
+  imul rdx
+  mov [rsp+8],rax
+
+  pop rdx
+  pop rax
+.endm
 
 # format: 4b nr, 4b ng, 4b nb
 

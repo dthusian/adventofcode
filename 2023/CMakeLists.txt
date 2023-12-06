@@ -4,6 +4,7 @@ project(adventofcode ASM)
 
 add_executable(adventofcode
         src/main.S
+        src/lib.S
         src/p1a.S
         src/p1b.S
         src/p2a.S
@@ -12,5 +13,7 @@ add_executable(adventofcode
         src/p3b.S
         src/p4a.S
         src/p4b.S
+        src/p5a.S
+        src/p5b.S
         )
 target_include_directories(adventofcode PRIVATE src/)
