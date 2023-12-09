@@ -25,3 +25,4 @@ aoccwrap malloc
 aoccwrap strtol
 aoccwrap fread
 aoccwrap memset
+aoccwrap qsort
