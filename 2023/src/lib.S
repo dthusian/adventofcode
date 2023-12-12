@@ -26,3 +26,6 @@ aoccwrap strtol
 aoccwrap fread
 aoccwrap memset
 aoccwrap qsort
+aoccwrap getc
+aoccwrap printf
+aoccwrap strlen
