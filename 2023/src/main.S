@@ -16,7 +16,7 @@ main:
   call fopen
   
   mov rdi,rax
-  call p8b
+  call p9b
 
   lea rdi,[str0]
   mov rsi,rax

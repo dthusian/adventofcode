@@ -23,6 +23,7 @@ aoccwrap fgets
 aoccwrap free
 aoccwrap malloc
 aoccwrap strtol
+aoccwrap strtoll
 aoccwrap fread
 aoccwrap memset
 aoccwrap qsort
