@@ -25,8 +25,10 @@ aoccwrap malloc
 aoccwrap strtol
 aoccwrap strtoll
 aoccwrap fread
+aoccwrap fwrite
 aoccwrap memset
 aoccwrap qsort
 aoccwrap getc
 aoccwrap printf
 aoccwrap strlen
+aoccwrap putchar

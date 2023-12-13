@@ -15,13 +15,17 @@ main:
   lea rsi,[str2]
   call fopen
   
+  mov rbx,rax
   mov rdi,rax
-  call p9b
+  call p10b
 
   lea rdi,[str0]
   mov rsi,rax
   xor eax,eax
   call printf
+
+  mov rdi,rbx
+  call fclose
 
   xor eax,eax
   pop rbx
