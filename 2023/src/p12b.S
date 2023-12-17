@@ -19,16 +19,18 @@
 
 .intel_syntax noprefix
 
-#define DPDIM 32
+#define DPDIM 256
 
 str0:
   .ascii "\xff\xff\xff\xff\xff\xff\xff\xff"
 str1:
   .asciz "r(%lli, %lli, %lli)\n"
+str2:
+  .asciz "i %lli\n"
 
 # struct obj { char c1[256]; uint32_t c2[64]; uint64_t c1len, uint64_t c2len }
 # (file*) -> obj*
-parse_single_line_12a:
+parse_single_line_12b:
   push rbp
   push rbx
   push r8
@@ -85,10 +87,6 @@ loop0:
   inc r14
   jmp loop0
 loop0end:
-
-  # add a trailing dot
-  mov byte ptr[r12],'.'
-  inc r12
   sub r12,r13
   mov [r13+512],r12
 
@@ -141,6 +139,59 @@ ret0:
   pop rbp
   ret
 
+unfold:
+  push rbp # arg
+  mov rbp,rdi
+
+  # add a ? to c1 to join them
+  mov rax,[rbp+512]
+  mov byte ptr[rbp+rax],'?'
+  inc qword ptr[rbp+512]
+
+  # copy c1
+.macro p12a_unfold_c1 iter
+  mov rax,[rbp+512]
+  imul rcx,rax,\iter
+  lea rdi,[rbp+rcx]
+  mov rsi,rbp
+  mov rdx,rax
+  call aocc_memcpy
+.endm
+
+  P12A_UNFOLD_C1 1
+  P12A_UNFOLD_C1 2
+  P12A_UNFOLD_C1 3
+  P12A_UNFOLD_C1 4
+
+  # copy c2
+.macro p12a_unfold_c2 iter
+  mov rax,[rbp+520]
+  shl rax,2
+  imul rcx,rax,\iter
+  lea rdi,[rbp+256+rcx]
+  lea rsi,[rbp+256]
+  mov rdx,rax
+  call aocc_memcpy
+.endm
+
+  P12A_UNFOLD_C2 1
+  P12A_UNFOLD_C2 2
+  P12A_UNFOLD_C2 3
+  P12A_UNFOLD_C2 4
+
+  # update lengths
+  imul rax,[rbp+512],5
+  mov [rbp+512],rax
+  imul rax,[rbp+520],5
+  mov [rbp+520],rax
+
+  # change the final ? to a trailing .
+  mov rax,[rbp+512]
+  mov byte ptr[rbp+rax-1],'.'
+
+  pop rbp
+  ret
+
 # WARN: nonstd colling conv!
 # required align: 16
 # r15: input, save
@@ -156,7 +207,7 @@ ret0:
   imul \rd,\rd,DPDIM
   add \rd,r10
 .endm
-recur_12a:
+recur_12b:
   # reject negative inputs first
   cmp r8,0
   jl br5a
@@ -225,14 +276,14 @@ br3a: # k = 0
   dec r8
   dec r9
   mov r10d,[r15+256+r9*4]
-  call recur_12a
+  call recur_12b
   mov rbx,rax
 
   mov r8,[rsp+16]
   dec r8
   mov r9,[rsp+8]
   xor r10,r10
-  call recur_12a
+  call recur_12b
   add rax,rbx
 
   jmp br3end
@@ -243,7 +294,7 @@ br3b: # k > 0
   # dp[i-1][j][k-1]
   dec r8
   dec r10
-  call recur_12a
+  call recur_12b
 
   jmp br3end
 br3c: # branch to jump to if should = 0
@@ -259,9 +310,10 @@ br3end:
   add rsp,8
   ret
 
-single_line_12a:
+# (input*, memo*)
+single_line_12b:
   push rbp
-  push rbx
+  push rbx # answer
   push r8  # i
   push r9  # j
   push r10 # k
@@ -273,10 +325,8 @@ single_line_12a:
   sub rsp,8
 
   mov r15,rdi
-  mov rdi,DPDIM*DPDIM*DPDIM*8
-  call aocc_malloc
-  mov r14,rax
-  mov rdi,rax
+  mov r14,rsi
+  mov rdi,r14
   mov rsi,0xff
   mov rdx,DPDIM*DPDIM*DPDIM*8
   call aocc_memset
@@ -284,7 +334,7 @@ single_line_12a:
   mov r8,[r15+512]
   mov r9,[r15+520]
   xor r10,r10
-  call recur_12a
+  call recur_12b
 
   add rsp,8
   pop r15
@@ -299,31 +349,41 @@ single_line_12a:
   pop rbp
   ret
 
-.global p12a
-p12a:
+.global p12b
+p12b:
   push rbp
-  push rbx # counter
+  push rbx # sum
   push r8
   push r9
   push r10
   push r11
-  push r12
-  push r13
+  push r12 # memoization array
+  push r13 # counter
   push r14 # input
   push r15 # file
   sub rsp,8
 
   mov r15,rdi
+
+  mov rdi,DPDIM*DPDIM*DPDIM*8
+  call aocc_malloc
+  mov r12,rax
+
   xor rbx,rbx
+  xor r13,r13
 loop2:
   mov rdi,r15
-  call parse_single_line_12a
+  call parse_single_line_12b
   cmp rax,0
   je loop2end
-
   mov r14,rax
-  mov rdi,rax
-  call single_line_12a
+
+  mov rdi,r14
+  call unfold
+
+  mov rdi,r14
+  mov rsi,r12
+  call single_line_12b
   add rbx,rax
 
   mov rdi,r14

@@ -17,7 +17,7 @@ main:
   
   mov rbx,rax
   mov rdi,rax
-  call p12a
+  call p12b
 
   lea rdi,[str0]
   mov rsi,rax
