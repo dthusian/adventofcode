@@ -26,6 +26,7 @@ aoccwrap strtol
 aoccwrap strtoll
 aoccwrap fread
 aoccwrap fwrite
+aoccwrap feof
 aoccwrap memset
 aoccwrap memcpy
 aoccwrap qsort

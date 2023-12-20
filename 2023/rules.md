@@ -1,9 +1,9 @@
 # AOC in x86_64 Assembly Challenge
 
 Rules:
-- No input preprocessing is allowed, with one exception. Solutions must take the input file verbatim.
-  - Exception: The solution can demand that trailing newlines or whitespace either be added or omitted.
-- No output postprocessing is allowed, with one exception. Solutions must output verbatim the string that is to be submitted.
+- No input preprocessing is allowed, with one exception. Otherwise, solutions must take the input file verbatim.
+  - Exception: The solution can demand that trailing whitespace either be added or omitted.
+- No output postprocessing is allowed, with one exception. Otherwise, solutions must output verbatim the string that is to be submitted.
   - Exception: If the string is encoded in ASCII art, the solution can output the art instead.
     An example of this is AOC 2021 Day 13 part 2.
 - All solutions must run in under 10 seconds, as measured by the `user` time in the `time` shell built-in.
