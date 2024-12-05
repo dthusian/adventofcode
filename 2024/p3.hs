@@ -47,8 +47,6 @@ part2 x =
 
 main :: IO ()
 main = do
-  file <- openFile "input.txt" ReadMode
-  contents <- hGetContents file
+  contents <- readFile "input.txt"
   print (part1 contents)
   print (part2 contents)
-  hClose file
