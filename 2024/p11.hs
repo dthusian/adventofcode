@@ -14,17 +14,17 @@ lower x = x `mod` (10 ^ (digits x `div` 2))
 lbf :: Int -> Int -> Int
 lbf 0 _ = 1
 lbf gen x
-  | x == 0 = lbf_memo (gen - 1) 1
-  | even (digits x) = lbf_memo (gen - 1) (upper x) + lbf_memo (gen - 1) (lower x)
-  | otherwise = lbf_memo (gen - 1) (x * 2024)
+  | x == 0 = lbfMemo (gen - 1) 1
+  | even (digits x) = lbfMemo (gen - 1) (upper x) + lbfMemo (gen - 1) (lower x)
+  | otherwise = lbfMemo (gen - 1) (x * 2024)
 
-lbf_memo = memoize2 lbf
+lbfMemo = memoize2 lbf
 
 part1 :: String -> Int
-part1 inp = sum (map (lbf_memo 25 . read) (words inp))
+part1 inp = sum (map (lbfMemo 25 . read) (words inp))
 
 part2 :: String -> Int
-part2 inp = sum (map (lbf_memo 75 . read) (words inp))
+part2 inp = sum (map (lbfMemo 75 . read) (words inp))
 
 main :: IO ()
 main = do
